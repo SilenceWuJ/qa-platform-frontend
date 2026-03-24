@@ -1,7 +1,13 @@
 <template>
-    <div class="testcase-list"></div>
+  <div class="testcase-list">
     <h1>测试用例</h1>
-    <el-button type="primary" @click="showCreateDialog = true" style="margin-bottom: 20px;">新增用例</el-button>
+    
+    <!-- 顶部操作栏 -->
+    <div class="action-bar">
+      <el-button type="primary" @click="showCreateDialog = true">新增用例</el-button>
+    </div>
+
+    <!-- 筛选条件 -->
     <div class="filters">
       <el-form inline>
         <el-form-item label="项目">
@@ -34,35 +40,52 @@
           <el-button @click="resetFilters">重置</el-button>
         </el-form-item>
       </el-form>
-    <el-row :gutter="20">
-      <el-col :span="8" v-for="tc in testCases" :key="tc.id">
-        <el-card shadow="hover" class="testcase-card">
-          <template #header>
-            <div class="card-header">
-              <span>{{ tc.name }}</span>
-              <el-tag :type="getResultType(tc.latest_result_status)">{{ tc.latest_result_status || '未执行' }}</el-tag>
-              <div class="card-header-right">
-                <el-button size="small" @click="showFilesDialogHandler(tc)">附件</el-button>
-              </div>
-            </div>
-          </template>
-          <div class="card-content">
-            <p><strong>类型：</strong>{{ getTypeName(tc.test_type_id) }}</p>
-            <p><strong>阶段：</strong>{{ getPhaseName(tc.test_phase_id) }}</p>
-            <p><strong>标记：</strong>{{ getMarkName(tc.mark_id) }}</p>
-            <p><strong>需求：</strong>{{ getRequirementName(tc.requirement_id) }}</p>
-          </div>
-          <template #footer>
-            <div class="card-actions">
-              <el-button size="small" @click="viewResult(tc.id)">结果</el-button>
-              <el-button size="small" @click="viewReport(tc.id)">报告</el-button>
-              <el-button size="small" @click="viewRequirement(tc.requirement_id)">需求</el-button>
-              <el-button size="small" type="primary" @click="executeTestCase(tc.id)">执行</el-button>
-            </div>
-          </template>
-        </el-card>
-      </el-col>
-    </el-row>
+    </div>
+
+    <!-- 测试用例表格 -->
+    <el-table 
+      :data="testCases" 
+      border 
+      stripe
+      v-loading="loading"
+      class="testcase-table"
+    >
+      <el-table-column prop="id" label="ID" width="80" align="center"></el-table-column>
+      <el-table-column prop="name" label="名称" min-width="150" show-overflow-tooltip></el-table-column>
+      <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip></el-table-column>
+      <el-table-column prop="project_name" label="项目" width="120"></el-table-column>
+      <el-table-column prop="requirement_name" label="需求" width="120"></el-table-column>
+      <el-table-column prop="mark_name" label="Mark标记" width="100"></el-table-column>
+      <el-table-column prop="test_phase_name" label="测试阶段" width="100"></el-table-column>
+      <el-table-column prop="test_type_name" label="测试类型" width="100"></el-table-column>
+      <el-table-column prop="latest_result_status" label="最新结果" width="100" align="center">
+        <template #default="{ row }">
+          <el-tag 
+            :type="getResultTagType(row.latest_result_status)" 
+            size="small"
+          >
+            {{ row.latest_result_status || '未执行' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="300" fixed="right" align="center">
+        <template #default="{ row }">
+          <el-button size="small" @click="viewTestCaseDetail(row.id)">详情</el-button>
+          <el-button size="small" type="primary" @click="viewResult(row.id)">结果</el-button>
+          <el-button size="small" type="success" @click="viewReport(row.id)">报告</el-button>
+          <el-button 
+            size="small" 
+            type="info" 
+            @click="viewRequirement(row.requirement_id)"
+            :disabled="!row.requirement_id"
+          >
+            需求
+          </el-button>
+          <el-button size="small" type="warning" @click="showFilesDialogHandler(row)">附件</el-button>
+          <el-button size="small" type="danger" @click="executeTestCase(row.id)">执行</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
 
     <!-- 创建用例弹窗 -->
     <el-dialog v-model="showCreateDialog" title="新增测试用例" width="50%">
@@ -189,6 +212,7 @@ const phases = ref([])
 const types = ref([])
 const marks = ref([])
 const testCases = ref([])
+const loading = ref(false)
 
 const filters = ref({
   project_id: route.params.projectId,
@@ -204,7 +228,7 @@ const testCaseForm = ref({
   description: '',
   steps: '',
   expected_result: '',
-  project_id: null,
+  project_id: route.params.projectId || null,
   requirement_id: null,
   test_phase_id: null,
   test_type_id: null,
@@ -221,7 +245,26 @@ const previewUrl = ref('')
 
 const executionProgressRef = ref()
 
+// 根据结果状态返回对应的标签类型
+const getResultTagType = (status) => {
+  if (!status) return 'info'
+  
+  const typeMap = {
+    '通过': 'success',
+    '失败': 'danger',
+    '阻塞': 'warning',
+    '跳过': 'info',
+    '未执行': 'info',
+    'passed': 'success',
+    'failed': 'danger',
+    'blocked': 'warning',
+    'skipped': 'info'
+  }
+  return typeMap[status] || 'info'
+}
+
 const fetchTestCases = async () => {
+  loading.value = true
   try {
     const params = {}
     if (filters.value.project_id) params.project_id = filters.value.project_id
@@ -230,9 +273,22 @@ const fetchTestCases = async () => {
     if (filters.value.test_type_id) params.test_type_id = filters.value.test_type_id
     if (filters.value.mark_id) params.mark_id = filters.value.mark_id
     const res = await getTestCases(params)
-    testCases.value = res.data
+    
+    // 格式化数据，确保所有字段都有值
+    testCases.value = (res.data || []).map(item => ({
+      ...item,
+      project_name: item.project_name || item.project?.name || '-',
+      requirement_name: item.requirement_name || item.requirement?.name || '-',
+      mark_name: item.mark_name || item.mark?.name || '-',
+      test_phase_name: item.test_phase_name || item.test_phase?.name || '-',
+      test_type_name: item.test_type_name || item.test_type?.name || '-',
+      latest_result_status: item.latest_result_status || '未执行'
+    }))
   } catch (err) {
     ElMessage.error('获取用例失败')
+    console.error('获取用例失败:', err)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -355,14 +411,8 @@ const resetFilters = () => {
   fetchTestCases()
 }
 
-const getTypeName = (id) => types.value.find(t => t.id === id)?.name || '-'
-const getPhaseName = (id) => phases.value.find(p => p.id === id)?.name || '-'
-const getMarkName = (id) => marks.value.find(m => m.id === id)?.name || '-'
-const getRequirementName = (id) => requirements.value.find(r => r.id === id)?.name || '-'
-const getResultType = (status) => {
-  if (status === 'passed') return 'success'
-  if (status === 'failed') return 'danger'
-  return 'info'
+const viewTestCaseDetail = (testcaseId) => {
+  router.push({ name: 'TestCaseDetail', params: { id: testcaseId } })
 }
 
 const viewResult = (testcaseId) => {
@@ -472,30 +522,50 @@ onBeforeUnmount(() => {
 .testcase-list {
   padding: 20px;
 }
+
+.action-bar {
+  margin-bottom: 20px;
+}
+
 .filters {
   margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
 }
-.testcase-card {
-  margin-bottom: 20px;
+
+.testcase-table {
+  margin-top: 20px;
 }
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.card-header-right {
-  display: flex;
-}
-.card-content p {
-  margin: 5px 0;
-}
-.card-actions {
-  display: flex;
-  justify-content: space-between;
-}
+
 .upload-hint {
   color: #909399;
   font-size: 12px;
   margin-top: 5px;
+}
+
+/* 操作按钮间距 */
+.el-button + .el-button {
+  margin-left: 8px;
+}
+
+/* 表格样式优化 */
+:deep(.el-table) {
+  font-size: 14px;
+}
+
+:deep(.el-table__header) {
+  background-color: #f5f7fa;
+}
+
+:deep(.el-table__row) {
+  height: 60px;
+}
+
+/* 操作列按钮样式 */
+:deep(.el-table__cell .el-button) {
+  margin: 2px;
+  padding: 5px 8px;
+  font-size: 12px;
 }
 </style>
