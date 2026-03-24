@@ -8,8 +8,27 @@
       <el-form-item label="描述">
         <el-input type="textarea" v-model="form.description" rows="3"></el-input>
       </el-form-item>
-      <el-form-item label="步骤">
-        <el-input type="textarea" v-model="form.steps" rows="5" placeholder="每步一行"></el-input>
+      <el-form-item label="测试步骤">
+        <div class="steps-editor">
+          <TestStepsDisplay
+            :steps="form.steps"
+            :editable="true"
+            :showJson="showJsonView"
+            :showStats="false"
+            @update:steps="handleStepsUpdate"
+          />
+          <div class="steps-actions">
+            <el-switch
+              v-model="showJsonView"
+              active-text="JSON视图"
+              inactive-text="可视化视图"
+              size="small"
+            />
+            <el-button type="primary" size="small" @click="addStep">
+              添加步骤
+            </el-button>
+          </div>
+        </div>
       </el-form-item>
       <el-form-item label="预期结果">
         <el-input type="textarea" v-model="form.expected_result" rows="3"></el-input>
@@ -110,6 +129,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import TestStepsDisplay from '@/components/TestStepsDisplay.vue'
 import { createTestCase as createTestCaseApi } from '@/api/testcase'
 import { getRequirements } from '@/api/requirement'
 import { getProjects } from '@/api/project'
@@ -125,13 +145,15 @@ const projectId = route.params.projectId
 const form = ref({
   name: '',
   description: '',
-  steps: '',
+  steps: [], // 改为数组格式，存储JSON步骤
   expected_result: '',
   requirement_id: null,
   test_phase_id: null,
   test_type_id: null,
   mark_id: null
 })
+
+const showJsonView = ref(false)
 
 const requirements = ref([])
 const phases = ref([])
@@ -223,6 +245,29 @@ const formatFileSize = (bytes) => {
   return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
 }
 
+// 处理测试步骤更新
+const handleStepsUpdate = (newSteps) => {
+  form.value.steps = newSteps
+}
+
+// 添加测试步骤
+const addStep = () => {
+  if (!form.value.steps) {
+    form.value.steps = []
+  }
+  
+  const newStep = {
+    step: form.value.steps.length + 1,
+    description: '',
+    expected: '',
+    actual: '',
+    status: 'pending',
+    data: {}
+  }
+  
+  form.value.steps.push(newStep)
+}
+
 const submitForm = async () => {
   if (!form.value.name) {
     ElMessage.warning('请输入用例名称')
@@ -265,7 +310,7 @@ const resetForm = () => {
   form.value = {
     name: '',
     description: '',
-    steps: '',
+    steps: [], // 重置为数组格式
     expected_result: '',
     requirement_id: null,
     test_phase_id: null,
@@ -274,6 +319,7 @@ const resetForm = () => {
   }
   fileList.value = []
   uploadedFiles.value = []
+  showJsonView.value = false
 }
 
 onMounted(() => {
@@ -297,6 +343,23 @@ onMounted(() => {
 .testcase-new {
   padding: 20px;
 }
+
+.steps-editor {
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  padding: 15px;
+  background-color: #fafafa;
+}
+
+.steps-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #e4e7ed;
+}
+
 .file-item {
   display: flex;
   align-items: center;

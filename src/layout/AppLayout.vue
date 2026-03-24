@@ -9,6 +9,9 @@
         text-color="#bfcbd9"
         active-text-color="#409EFF"
       >
+        <el-menu-item index="/dashboard">
+          <span class="menu-text">数据看板</span>
+        </el-menu-item>
         <el-menu-item index="/projects">
           <span class="menu-text">项目</span>
         </el-menu-item>
@@ -29,6 +32,9 @@
         </el-menu-item>
         <el-menu-item index="/execution-records">
           <span class="menu-text">执行记录</span>
+        </el-menu-item>
+        <el-menu-item index="/execution-monitor">
+          <span class="menu-text">实时监控</span>
         </el-menu-item>
       </el-menu>
     </el-aside>

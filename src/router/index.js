@@ -9,14 +9,16 @@ import RequirementDetail from "../views/RequirementDetail.vue";
 import ReportDetail from "../views/ReportDetail.vue";
 import TestCaseNew from "../views/TestCaseNew.vue";
 import TestCaseList from "../views/TestCaseList.vue";
+import TestCaseDetail from "../views/TestCaseDetail.vue";
 import AppLayout from "@/layout/AppLayout.vue";
 
 const routes = [
   {
     path: "/",
     component: AppLayout,
-    redirect: "/projects",
+    redirect: "/dashboard",
     children: [
+      { path: "dashboard", name: "Dashboard", component: () => import('../views/Dashboard.vue') },
       { path: "projects", name: "ProjectBoard", component: ProjectBoard },
       { path: "testcases", name: "AllTestCases", component: AllTestCases },
       {
@@ -32,13 +34,30 @@ const routes = [
         name: "ExecutionRecords",
         component: ExecutionList,
       }, // 复用
-      // 详细页面（不嵌套在Layout中，或者也可以嵌套，看需求）
+      // 详细页面
       {
         path: "requirements/:id",
         name: "RequirementDetail",
         component: RequirementDetail,
       },
       { path: "reports/:id", name: "ReportDetail", component: ReportDetail },
+      {
+        path: "testcases/:id",
+        name: "TestCaseDetail",
+        component: TestCaseDetail,
+        props: true,
+      },
+      {
+        path: "executions/:id",
+        name: "ExecutionDetail",
+        component: () => import('../views/ExecutionDetail.vue'),
+        props: true,
+      },
+      {
+        path: "execution-monitor",
+        name: "ExecutionMonitor",
+        component: () => import('../views/ExecutionMonitor.vue'),
+      },
       {
         path: "projects/:projectId/testcases",
         name: "TestCaseList",
